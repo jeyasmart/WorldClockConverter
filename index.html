@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#102a43">
+  <meta name="description" content="A reference-based world clock for planning across time zones.">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='42' fill='%23ffb703'/%3E%3Cpath d='M50 25v27l18 11' fill='none' stroke='%23102a43' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="styles.css">
+  <title>Northstar Clocks</title>
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <a class="brand" href="#" aria-label="Northstar Clocks home"><span class="brand-mark">N</span><span>Northstar <strong>Clocks</strong></span></a>
+      <div class="top-actions"><button class="theme-button" id="theme-button" type="button" aria-label="Switch to dark theme" title="Switch theme"><span id="theme-icon">☾</span><span class="button-text">Theme</span></button><button class="install-button" id="install-button" type="button" hidden>Install app</button></div>
+    </header>
+
+    <section class="converter" aria-labelledby="converter-heading">
+      <div class="section-heading"><p class="source-context">From <strong id="reference-city">Detecting location</strong><span id="reference-zone-name">Your device time zone</span></p><button class="now-button" id="now-button" type="button">Reset to now</button></div>
+      <label class="field compare-field"><input class="zone-search" id="zone-search" type="search" placeholder="Search a city or time zone" aria-label="Destination time zone" autocomplete="off"><div class="autocomplete-list" id="zone-options" role="listbox" hidden></div><select id="zone-select" aria-hidden="true" hidden></select></label>
+      <div class="result-strip"><div class="result-zone"><span class="result-icon">◎</span><div><strong id="result-city">Select a destination</strong><small id="result-zone">Converted local time</small></div></div><div class="result-time" id="result-time">--:--</div><div class="result-date" id="result-date">--</div></div>
+      <div class="local-controls">
+        <button class="local-edit-field" id="time-edit-button" type="button"><span>Your local time</span><strong id="time-display">--:--</strong></button>
+        <button class="local-edit-field" id="date-edit-button" type="button"><span>Your local date</span><strong id="date-display">----</strong></button>
+        <input id="time-input" type="hidden"><input id="date-input" type="hidden">
+      </div>
+      <div class="preferences"><span class="preference-label">DISPLAY</span><div class="format-toggle" role="group" aria-label="Time format"><button type="button" data-format="12">12 hour</button><button type="button" data-format="24">24 hour</button></div><button class="add-button" id="add-button" type="button"><span>+</span> Add clock</button></div>
+    </section>
+
+    <section class="saved-section" aria-labelledby="saved-heading">
+      <div class="clock-grid" id="clock-grid"></div>
+      <div class="empty-state" id="empty-state"><span class="empty-mark">+</span><p>Your clock constellation is empty.</p><button type="button" id="empty-add">Add a city to get started</button></div>
+    </section>
+
+    <footer><span>Northstar Clocks</span><span>Time zones update automatically</span></footer>
+  </main>
+  <dialog class="local-dialog" id="local-dialog"><form method="dialog" id="local-form"><div class="dialog-heading"><p class="dialog-helper" id="local-dialog-zone">Based on your location</p><button class="dialog-close" value="cancel" aria-label="Close">×</button></div><div class="clock-picker"><div class="clock-picker-step" id="clock-picker-step">Select hour</div><div class="clock-face" id="clock-face"></div><div class="clock-picker-value" id="clock-picker-value">12:00 PM</div><div class="period-toggle" id="period-toggle" role="group" aria-label="AM or PM"><button type="button" data-period="AM">AM</button><button type="button" data-period="PM">PM</button></div><div class="calendar-panel" id="calendar-panel" hidden><div class="calendar-header"><button type="button" id="calendar-prev" aria-label="Previous month">‹</button><strong id="calendar-month">August 2026</strong><button type="button" id="calendar-next" aria-label="Next month">›</button></div><div class="calendar-weekdays"><span>Su</span><span>Mo</span><span>Tu</span><span>We</span><span>Th</span><span>Fr</span><span>Sa</span></div><div class="calendar-days" id="calendar-days"></div></div></div><div class="local-dialog-fields"><label class="field"><span>Your local time</span><input class="dialog-value-input" id="dialog-time-display" type="text" inputmode="text" autocomplete="off" aria-label="Editable local time"></label><input id="dialog-time-input" type="hidden"><label class="field"><span>Your local date</span><input class="dialog-value-input" id="dialog-date-input" type="text" inputmode="numeric" autocomplete="off" aria-label="Editable local date"></label></div><div class="dialog-actions"><button class="dialog-cancel" value="cancel">Cancel</button><button class="dialog-save" value="save">Apply time</button></div></form></dialog>
+  <dialog class="city-dialog" id="city-dialog"><form method="dialog" id="city-form"><div class="dialog-heading"><div><p class="eyebrow">CLOCK SETTINGS</p><h2 id="dialog-title">Add a city</h2></div><button class="dialog-close" value="cancel" aria-label="Close">×</button></div><label class="field"><span>City / time zone</span><input class="zone-search" id="city-search" type="search" placeholder="Type to search cities" aria-label="City or time zone" autocomplete="off"><div class="autocomplete-list" id="city-options" role="listbox" hidden></div><select id="city-zone" aria-hidden="true" hidden></select></label><label class="field"><span>Display name <small>(optional)</small></span><input id="city-label" type="text" maxlength="32" placeholder="Use the city name"></label><div class="dialog-actions"><button class="dialog-cancel" value="cancel">Cancel</button><button class="dialog-save" value="save">Save clock</button></div></form></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
