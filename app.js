@@ -1,4 +1,4 @@
-const referenceZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 const savedKey = 'northstar-saved-clocks';
 const preferencesKey = 'northstar-preferences';
 const defaultZones = ['Asia/Colombo', 'Europe/London', 'Asia/Tokyo'];
@@ -17,7 +17,7 @@ const browserZones =
 
 const allZones = [
   ...new Set([
-    referenceZone,
+    deviceZone,
     ...Object.keys(zoneLabels),
     ...browserZones
   ])
@@ -25,6 +25,7 @@ const allZones = [
 let savedZones = JSON.parse(localStorage.getItem(savedKey) || 'null') || defaultZones;
 savedZones = savedZones.map((item) => typeof item === 'string' ? { zone: item, label: '' } : item);
 let preferences = JSON.parse(localStorage.getItem(preferencesKey) || 'null') || { format: '12', theme: 'light' };
+let referenceZone = preferences.referenceZone || deviceZone;
 let editingIndex = null;
 let deferredInstall;
 let clockPickerMode = 'hour';
@@ -88,13 +89,16 @@ function populateZones() {
   const options = allZones.map((zone) => `<option value="${zone}">${cityName(zone)}  (${zone})</option>`).join('');
   $('zone-select').innerHTML = options;
   $('city-zone').innerHTML = options;
+  $('reference-zone-select').innerHTML = options;
   $('zone-select').value = referenceZone;
   $('zone-search').value = zoneInputValue(referenceZone);
+  $('reference-zone-select').value = referenceZone;
+  $('reference-zone-search').value = zoneInputValue(referenceZone);
 }
 
 const zoneInputValue = (zone) => `${cityName(zone)} (${zone})`;
-function renderAutocomplete(inputId, listId, selectId) { const query = $(inputId).value.trim().toLowerCase(); const matches = allZones.filter((zone) => `${cityName(zone)} ${zone}`.toLowerCase().includes(query)); const list = $(listId); list.innerHTML = matches.map((zone) => `<button type="button" data-zone="${zone}" role="option">${zone === referenceZone ? 'Your location - ' : ''}${cityName(zone)} <small>${zone}</small></button>`).join(''); list.hidden = !matches.length; list.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => { $(selectId).value = button.dataset.zone; $(inputId).value = zoneInputValue(button.dataset.zone); list.hidden = true; if (selectId === 'zone-select') convert(); })); }
-function syncZoneInput(inputId, listId, selectId) { renderAutocomplete(inputId, listId, selectId); const query = $(inputId).value.trim().toLowerCase(); const match = allZones.find((zone) => zoneInputValue(zone).toLowerCase() === query) || allZones.find((zone) => `${cityName(zone)} ${zone}`.toLowerCase() === query); if (match) { $(selectId).value = match; if (selectId === 'zone-select') convert(); } }
+function renderAutocomplete(inputId, listId, selectId) { const query = $(inputId).value.trim().toLowerCase(); const matches = allZones.filter((zone) => `${cityName(zone)} ${zone}`.toLowerCase().includes(query)); const list = $(listId); list.innerHTML = matches.map((zone) => `<button type="button" data-zone="${zone}" role="option">${zone === deviceZone ? 'Device location - ' : ''}${cityName(zone)} <small>${zone}</small></button>`).join(''); list.hidden = !matches.length; list.querySelectorAll('button').forEach((button) => button.addEventListener('click', () => { $(selectId).value = button.dataset.zone; $(inputId).value = zoneInputValue(button.dataset.zone); list.hidden = true; if (selectId === 'zone-select') convert(); if (selectId === 'reference-zone-select') setReferenceZone(button.dataset.zone); })); }
+function syncZoneInput(inputId, listId, selectId) { renderAutocomplete(inputId, listId, selectId); const query = $(inputId).value.trim().toLowerCase(); const match = allZones.find((zone) => zoneInputValue(zone).toLowerCase() === query) || allZones.find((zone) => `${cityName(zone)} ${zone}`.toLowerCase() === query); if (match) { $(selectId).value = match; if (selectId === 'zone-select') convert(); if (selectId === 'reference-zone-select') setReferenceZone(match); } }
 
 function inputDateAsDate() {
   const date = $('date-input').value;
@@ -105,6 +109,19 @@ function inputDateAsDate() {
   const guess = new Date(Date.UTC(year, month - 1, day, hour, minute));
   const correction = offsetMinutes(guess, referenceZone);
   return new Date(guess.getTime() - correction * 60000);
+}
+
+function setReferenceZone(zone) {
+  const current = inputDateAsDate();
+  referenceZone = zone;
+  preferences.referenceZone = zone;
+  localStorage.setItem(preferencesKey, JSON.stringify(preferences));
+  $('reference-zone-select').value = zone;
+  $('reference-zone-search').value = zoneInputValue(zone);
+  $('date-input').value = localInputDate(current);
+  $('time-input').value = localInputTime(current);
+  referenceNow();
+  showToast(`${cityName(zone)} is now the local anchor`);
 }
 
 function convert() {
@@ -274,6 +291,24 @@ function showToast(message) {
 }
 
 $('date-input').addEventListener('input', () => { updateLocalEditButtons(); convert(); renderClocks(inputDateAsDate()); }); $('time-input').addEventListener('input', () => { updateLocalEditButtons(); convert(); renderClocks(inputDateAsDate()); }); $('time-edit-button').addEventListener('click', () => { openLocalDialog(); renderClockPicker(); updatePeriodButtons(); }); $('date-edit-button').addEventListener('click', () => { openLocalDialog(); clockPickerMode = 'date'; renderClockPicker(); }); $('dialog-time-display').addEventListener('click', () => { clockPickerMode = 'hour'; renderClockPicker(); updatePeriodButtons(); }); $('dialog-time-display').addEventListener('input', () => { const parsed = parseTypedTime($('dialog-time-display').value); if (!parsed) return; $('dialog-time-input').value = parsed; renderClockPicker(); updatePeriodButtons(); }); $('dialog-date-input').addEventListener('click', () => { clockPickerMode = 'date'; renderClockPicker(); }); $('dialog-date-input').addEventListener('input', () => { const parsed = parseTypedDate($('dialog-date-input').value); if (!parsed) return; $('dialog-date-input').value = parsed; $('date-input').value = parsed; calendarView = new Date(`${parsed}T12:00:00`); clockPickerMode = 'date'; renderClockPicker(); }); $('dialog-time-input').addEventListener('input', () => { renderClockPicker(); updatePeriodButtons(); }); $('calendar-prev').addEventListener('click', () => { calendarView.setMonth(calendarView.getMonth() - 1); renderCalendar(); }); $('calendar-next').addEventListener('click', () => { calendarView.setMonth(calendarView.getMonth() + 1); renderCalendar(); }); document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => setPeriod(button.dataset.period))); $('local-form').addEventListener('submit', (event) => { if (event.submitter?.value !== 'save') return; event.preventDefault(); applyLocalDialog(); $('local-dialog').close(); }); $('zone-search').addEventListener('input', () => syncZoneInput('zone-search', 'zone-options', 'zone-select')); $('zone-search').addEventListener('focus', () => renderAutocomplete('zone-search', 'zone-options', 'zone-select')); $('city-search').addEventListener('input', () => syncZoneInput('city-search', 'city-options', 'city-zone')); $('city-search').addEventListener('focus', () => renderAutocomplete('city-search', 'city-options', 'city-zone')); document.addEventListener('click', (event) => { if (!event.target.closest('.field')) document.querySelectorAll('.autocomplete-list').forEach((list) => { list.hidden = true; }); }); $('add-button').addEventListener('click', addZone); $('empty-add').addEventListener('click', addZone); $('now-button').addEventListener('click', () => { $('date-input').value = ''; $('time-input').value = ''; referenceNow(); });
+$('reference-zone-search').addEventListener('input', () => syncZoneInput('reference-zone-search', 'reference-zone-options', 'reference-zone-select'));
+$('reference-zone-search').addEventListener('focus', () => renderAutocomplete('reference-zone-search', 'reference-zone-options', 'reference-zone-select'));
+$('reference-zone-search').addEventListener('change', () => syncZoneInput('reference-zone-search', 'reference-zone-options', 'reference-zone-select'));
+$('reference-zone-search').addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') $('reference-zone-options').hidden = true;
+  if (event.key === 'Enter') {
+    const firstMatch = $('reference-zone-options').querySelector('button');
+    if (firstMatch) { event.preventDefault(); firstMatch.click(); }
+  }
+});
+$('reference-zone-options').addEventListener('pointerdown', (event) => {
+  const button = event.target.closest('button[data-zone]');
+  if (button) { event.preventDefault(); button.click(); }
+});
+document.addEventListener('pointerdown', (event) => {
+  if (!event.target.closest('.anchor-zone-picker')) $('reference-zone-options').hidden = true;
+});
+$('date-edit-button').addEventListener('click', () => { openLocalDialog(); renderClockPicker(); updatePeriodButtons(); });
 $('theme-button').addEventListener('click', () => { setPreference('theme', preferences.theme === 'dark' ? 'light' : 'dark'); applyPreferences(); });
 document.querySelectorAll('[data-format]').forEach((button) => button.addEventListener('click', () => { setPreference('format', button.dataset.format); applyPreferences(); referenceNow(); }));
 $('city-form').addEventListener('submit', (event) => { if (event.submitter?.value !== 'save') return; event.preventDefault(); if (saveCity()) $('city-dialog').close(); });

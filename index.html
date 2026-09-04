@@ -53,11 +53,18 @@
           <button class="anchor-time-button" id="time-edit-button" type="button"><strong id="time-display">--:--</strong></button>
           <span class="anchor-zone-name">Local time</span>
         </div>
-        <button class="anchor-date-row" id="date-edit-button" type="button">
-          <span class="calendar-symbol">▣</span>
-          <strong id="date-display">----</strong>
-          <span class="sync-status"><i></i>SYNCHRONIZED</span>
-        </button>
+        <div class="anchor-date-row">
+          <button class="anchor-date-button" id="date-edit-button" type="button">
+            <span class="calendar-symbol">▣</span>
+            <strong id="date-display">----</strong>
+          </button>
+          <label class="anchor-zone-picker">
+            <span>ANCHOR ZONE</span>
+            <input id="reference-zone-search" type="search" placeholder="Select time zone" aria-label="Local anchor time zone" autocomplete="off">
+            <div class="autocomplete-list" id="reference-zone-options" role="listbox" hidden></div>
+            <select id="reference-zone-select" aria-hidden="true" hidden></select>
+          </label>
+        </div>
         <input id="time-input" type="hidden">
         <input id="date-input" type="hidden">
         <div class="time-shift-panel">
