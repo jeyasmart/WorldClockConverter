@@ -1,4 +1,5 @@
 const deviceZone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+const defaultReferenceZone = 'America/Toronto';
 const savedKey = 'northstar-saved-clocks';
 const preferencesKey = 'northstar-preferences';
 const defaultZones = ['Asia/Colombo', 'Europe/London', 'Asia/Tokyo'];
@@ -25,11 +26,12 @@ const allZones = [
 let savedZones = JSON.parse(localStorage.getItem(savedKey) || 'null') || defaultZones;
 savedZones = savedZones.map((item) => typeof item === 'string' ? { zone: item, label: '' } : item);
 let preferences = JSON.parse(localStorage.getItem(preferencesKey) || 'null') || { format: '12', theme: 'light' };
-let referenceZone = preferences.referenceZone || deviceZone;
+let referenceZone = preferences.referenceZone || defaultReferenceZone;
 let editingIndex = null;
 let deferredInstall;
 let clockPickerMode = 'hour';
 let calendarView = new Date();
+let timeShiftHours = 0;
 
 const $ = (id) => document.getElementById(id);
 //const cityName = (zone) => zoneLabels[zone] || zone.split('/').pop().replace(/_/g, ' ');
@@ -55,12 +57,16 @@ const localInputTime = (date) => { const p = parts(date, referenceZone); return 
 
 function referenceNow() {
   const now = new Date();
+  const displayedNow = new Date(now.getTime() + timeShiftHours * 60 * 60 * 1000);
   $('reference-city').textContent = cityName(referenceZone);
   $('reference-zone-name').textContent = `${referenceZone}  ·  ${offsetText(now, referenceZone)}`;
-  if (!$('date-input').value) { $('date-input').value = localInputDate(now); $('time-input').value = localInputTime(now); }
+  if (!$('date-input').value || timeShiftHours !== 0) {
+    $('date-input').value = localInputDate(displayedNow);
+    $('time-input').value = localInputTime(displayedNow);
+  }
   updateLocalEditButtons();
   //renderClocks(displayReferenceDate(now));
-  updateClockValues(displayReferenceDate(now));
+  updateClockValues(timeShiftHours === 0 ? displayReferenceDate(now) : displayedNow);
   convert();
 }
 
@@ -69,8 +75,15 @@ function updateLocalEditButtons() {
   $('time-display').textContent = format(value, referenceZone, { hour: '2-digit', minute: '2-digit', hour12: hour12() });
   $('date-display').textContent = format(value, referenceZone, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 }
+function applyTimeShift(value) {
+  const nextShift = Number(value);
+  timeShiftHours = nextShift;
+  $('shift-input').parentElement.style.setProperty('--shift-position', `${((nextShift + 12) / 24) * 100}%`);
+  $('time-shift-value').textContent = `${nextShift > 0 ? '+' : ''}${nextShift} hrs${nextShift === 0 ? ' (Realtime)' : ''}`;
+  referenceNow();
+}
 function openLocalDialog() { clockPickerMode = 'hour'; $('dialog-date-input').value = $('date-input').value; $('dialog-time-input').value = $('time-input').value; calendarView = new Date(`${$('date-input').value}T12:00:00`); $('local-dialog-zone').textContent = `Based on ${cityName(referenceZone)} · ${referenceZone}`; $('local-dialog').showModal(); }
-function applyLocalDialog() { $('date-input').value = $('dialog-date-input').value; $('time-input').value = $('dialog-time-input').value; updateLocalEditButtons(); convert(); renderClocks(inputDateAsDate()); }
+function applyLocalDialog() { timeShiftHours = 0; $('shift-input').value = '0'; $('shift-input').style.setProperty('--shift-position', '50%'); $('time-shift-value').textContent = '0 hrs (Realtime)'; $('date-input').value = $('dialog-date-input').value; $('time-input').value = $('dialog-time-input').value; updateLocalEditButtons(); convert(); renderClocks(inputDateAsDate()); }
 function formatTimeValue(value) { const [hour, minute] = (value || '12:00').split(':').map(Number); return `${String(hour % 12 || 12).padStart(2, '0')}:${String(minute).padStart(2, '0')} ${hour >= 12 ? 'PM' : 'AM'}`; }
 function updatePeriodButtons() { const hour = Number(($('dialog-time-input').value || '12:00').split(':')[0]); document.querySelectorAll('[data-period]').forEach((button) => button.classList.toggle('active', button.dataset.period === (hour >= 12 ? 'PM' : 'AM'))); }
 function setPeriod(period) { const [rawHour, minute] = ($('dialog-time-input').value || '12:00').split(':').map(Number); let hour = rawHour % 12; if (period === 'PM') hour += 12; $('dialog-time-input').value = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`; renderClockPicker(); updatePeriodButtons(); }
@@ -111,6 +124,21 @@ function inputDateAsDate() {
   return new Date(guess.getTime() - correction * 60000);
 }
 
+function resetReferenceZone() {
+  referenceZone = defaultReferenceZone;
+  timeShiftHours = 0;
+  preferences.referenceZone = referenceZone;
+  localStorage.setItem(preferencesKey, JSON.stringify(preferences));
+  $('reference-zone-select').value = referenceZone;
+  $('reference-zone-search').value = zoneInputValue(referenceZone);
+  $('date-input').value = '';
+  $('time-input').value = '';
+  $('shift-input').value = '0';
+  $('shift-input').parentElement.style.setProperty('--shift-position', '50%');
+  $('time-shift-value').textContent = '0 hrs (Realtime)';
+  referenceNow();
+}
+
 function setReferenceZone(zone) {
   const current = inputDateAsDate();
   referenceZone = zone;
@@ -142,20 +170,6 @@ function renderClocks(now = new Date()) {
   document.querySelectorAll('.move-menu button').forEach((button) => button.addEventListener('click', () => moveZone(Number(button.dataset.index), button.dataset.direction)));
   document.querySelectorAll('.move-button').forEach((button) => button.addEventListener('click', () => moveZone(Number(button.dataset.index), button.dataset.direction)));
   document.querySelectorAll('.clock-card').forEach((card) => {
-    let startX = 0;
-    let startY = 0;
-    card.addEventListener('touchstart', (event) => {
-      const touch = event.changedTouches[0];
-      startX = touch.clientX;
-      startY = touch.clientY;
-    }, { passive: true });
-    card.addEventListener('touchend', (event) => {
-      const touch = event.changedTouches[0];
-      const deltaX = touch.clientX - startX;
-      const deltaY = touch.clientY - startY;
-      if (Math.abs(deltaY) < 40 || Math.abs(deltaY) < Math.abs(deltaX)) return;
-      moveZone(Number(card.dataset.index), deltaY < 0 ? 'up' : 'down');
-    }, { passive: true });
     card.addEventListener('dragstart', (event) => { event.dataTransfer.setData('text/plain', card.dataset.index); card.classList.add('dragging'); });
     card.addEventListener('dragend', () => card.classList.remove('dragging'));
     card.addEventListener('dragover', (event) => { event.preventDefault(); card.classList.add('drag-over'); });
@@ -292,6 +306,8 @@ function showToast(message) {
 
 $('date-input').addEventListener('input', () => { updateLocalEditButtons(); convert(); renderClocks(inputDateAsDate()); }); $('time-input').addEventListener('input', () => { updateLocalEditButtons(); convert(); renderClocks(inputDateAsDate()); }); $('time-edit-button').addEventListener('click', () => { openLocalDialog(); renderClockPicker(); updatePeriodButtons(); }); $('date-edit-button').addEventListener('click', () => { openLocalDialog(); clockPickerMode = 'date'; renderClockPicker(); }); $('dialog-time-display').addEventListener('click', () => { clockPickerMode = 'hour'; renderClockPicker(); updatePeriodButtons(); }); $('dialog-time-display').addEventListener('input', () => { const parsed = parseTypedTime($('dialog-time-display').value); if (!parsed) return; $('dialog-time-input').value = parsed; renderClockPicker(); updatePeriodButtons(); }); $('dialog-date-input').addEventListener('click', () => { clockPickerMode = 'date'; renderClockPicker(); }); $('dialog-date-input').addEventListener('input', () => { const parsed = parseTypedDate($('dialog-date-input').value); if (!parsed) return; $('dialog-date-input').value = parsed; $('date-input').value = parsed; calendarView = new Date(`${parsed}T12:00:00`); clockPickerMode = 'date'; renderClockPicker(); }); $('dialog-time-input').addEventListener('input', () => { renderClockPicker(); updatePeriodButtons(); }); $('calendar-prev').addEventListener('click', () => { calendarView.setMonth(calendarView.getMonth() - 1); renderCalendar(); }); $('calendar-next').addEventListener('click', () => { calendarView.setMonth(calendarView.getMonth() + 1); renderCalendar(); }); document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => setPeriod(button.dataset.period))); $('local-form').addEventListener('submit', (event) => { if (event.submitter?.value !== 'save') return; event.preventDefault(); applyLocalDialog(); $('local-dialog').close(); }); $('zone-search').addEventListener('input', () => syncZoneInput('zone-search', 'zone-options', 'zone-select')); $('zone-search').addEventListener('focus', () => renderAutocomplete('zone-search', 'zone-options', 'zone-select')); $('city-search').addEventListener('input', () => syncZoneInput('city-search', 'city-options', 'city-zone')); $('city-search').addEventListener('focus', () => renderAutocomplete('city-search', 'city-options', 'city-zone')); document.addEventListener('click', (event) => { if (!event.target.closest('.field')) document.querySelectorAll('.autocomplete-list').forEach((list) => { list.hidden = true; }); }); $('add-button').addEventListener('click', addZone); $('empty-add').addEventListener('click', addZone); $('now-button').addEventListener('click', () => { $('date-input').value = ''; $('time-input').value = ''; referenceNow(); });
 $('reference-zone-search').addEventListener('input', () => syncZoneInput('reference-zone-search', 'reference-zone-options', 'reference-zone-select'));
+$('now-button').addEventListener('click', resetReferenceZone);
+$('shift-input').addEventListener('input', (event) => applyTimeShift(event.target.value));
 $('reference-zone-search').addEventListener('focus', () => renderAutocomplete('reference-zone-search', 'reference-zone-options', 'reference-zone-select'));
 $('reference-zone-search').addEventListener('change', () => syncZoneInput('reference-zone-search', 'reference-zone-options', 'reference-zone-select'));
 $('reference-zone-search').addEventListener('keydown', (event) => {

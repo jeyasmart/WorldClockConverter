@@ -68,8 +68,11 @@
         <input id="time-input" type="hidden">
         <input id="date-input" type="hidden">
         <div class="time-shift-panel">
-          <div class="time-shift-heading"><span>SIMULATE TIME SHIFT</span><strong>0 hrs (Realtime)</strong></div>
-          <div class="shift-track"><span class="shift-knob"></span></div>
+          <div class="time-shift-heading"><span>SIMULATE TIME SHIFT</span><strong id="time-shift-value">0 hrs (Realtime)</strong></div>
+          <label class="shift-track" for="shift-input">
+            <input id="shift-input" type="range" min="-12" max="12" step="1" value="0" aria-label="Simulate time shift in hours">
+            <span class="shift-knob"></span>
+          </label>
           <div class="shift-scale"><span>-12h</span><span>Past</span><span>0</span><span>Future</span><span>+12h</span></div>
         </div>
       </div>
